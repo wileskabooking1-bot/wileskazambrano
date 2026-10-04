@@ -25,8 +25,27 @@ Jev takes the judgements. Code takes the arithmetic. Grok Bot seats size, fill a
 | `pick.py` | one `choice` + one `noul` over the survivors. |
 | `book.py` | one position at a time, a bench whose length depends on what fired, and holder/price snapshots that give the shape question real growth. |
 | `main.py` | the shift. Every 15 minutes. Shadow by default. |
+| `run_desk.py` | setup, start, check and seats in one command, on Mac, Windows and Linux. |
 | `desk.py` | the Grok Bot side `main.py` needs: bank, SOCIAL read, shadow log, Telegram, seats. |
 | `prompts/` | HANDOFF, SOCIAL, CHIEF, SIZE, FILLS, RISK. Paste into the seats. |
+
+## Quick start
+
+```bash
+git clone https://github.com/wileskabooking1-bot/wileskazambrano.git
+cd wileskazambrano
+python run_desk.py setup     # key, desk secret, bank, Telegram, FOMO login. Once.
+python run_desk.py start     # judge + tunnel + Chrome + the shift, in shadow mode
+python run_desk.py seats     # what to paste into each Grok Bot seat
+python run_desk.py check     # is everything up and answering
+```
+
+`setup` asks only for what needs you: the Jev key, the Telegram bot token, and one FOMO
+login in a Chrome window it opens with its own desk profile (Chrome 136+ will not expose
+your normal profile to the desk). Install `cloudflared` once so the bots can reach the
+judge. `start --live` sends real orders.
+
+The rest of this section is the same setup by hand.
 
 ## Setup, in order
 
@@ -59,8 +78,8 @@ cloudflared tunnel --url http://localhost:8080     # bots run in xAI's cloud
 Bots get `JUDGE_URL=https://<tunnel>/judge` and `DESK_SECRET`. Never the TypeSafe key.
 Prove the link from a bot's own terminal with the curl in `prompts/handoff.md`.
 
-**4. FOMO session.** Start Chrome with `--remote-debugging-port=9222`, log into
-fomo.family, leave the tab open. Then check the field mapping once against a real token:
+**4. FOMO session.** Start Chrome with `--remote-debugging-port=9222 --user-data-dir=~/.desk-chrome`
+(Chrome 136+ ignores the port on your normal profile), log into fomo.family, leave the tab open. Then check the field mapping once against a real token:
 
 ```bash
 python fomo_api.py <addr>:<netId>

@@ -23,7 +23,7 @@ Jev takes the judgements. Code takes the arithmetic. Grok Bot seats size, fill a
 | `collect.py` | GeckoTerminal, FOMO, DexScreener, Solana RPC. Builds the states. |
 | `fomo_api.py` | your logged-in FOMO session, read out of Chrome over CDP. |
 | `pick.py` | one `choice` + one `noul` over the survivors. |
-| `book.py` | one position at a time, and a bench whose length depends on what fired. |
+| `book.py` | one position at a time, a bench whose length depends on what fired, and holder/price snapshots that give the shape question real growth. |
 | `main.py` | the shift. Every 15 minutes. Shadow by default. |
 | `desk.py` | the Grok Bot side `main.py` needs: bank, SOCIAL read, shadow log, Telegram, seats. |
 | `prompts/` | HANDOFF, SOCIAL, CHIEF, SIZE, FILLS, RISK. Paste into the seats. |

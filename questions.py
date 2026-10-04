@@ -2,15 +2,18 @@ from typesafe_sdk import Choice, Noul, Score
 
 MARKET = {
     "shape": Choice(
-        instructions="Classify the shape of this launch from the fields in `state`.",
+        instructions="Classify the shape of this launch from the fields in `state`. "
+                     "`growth` holds holders_pct and price_pct over the same window, "
+                     "measured between two snapshots. A null window was not observed.",
         criteria={
-            "crowd": "Holders growing faster than price. Buys outnumber sells across both "
-                     "recent windows. Volume spread rather than spiking once.",
-            "one_buyer": "Price climbing faster than holders. Holder growth flat while "
-                         "price rises. One wallet walking the price up.",
+            "crowd": "holders_pct at or above price_pct in `growth`. Buys outnumber sells "
+                     "across both recent windows. Volume spread rather than spiking once.",
+            "one_buyer": "price_pct well above holders_pct in `growth`. Holder growth flat "
+                         "while price rises. One wallet walking the price up.",
             "fading": "Recent volume is a small fraction of the daily average, or sells "
                       "outnumber buys in both recent windows.",
-            "too_early": "Too few data points to tell any of the above apart yet.",
+            "too_early": "Every window in `growth` is null, or too few data points to tell "
+                         "any of the above apart yet.",
         }),
     "liquidity_fits_ticket": Noul(
         instructions="A position of `intended_ticket_usd` could be exited into "

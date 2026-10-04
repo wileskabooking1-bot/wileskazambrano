@@ -1,0 +1,7 @@
+typesafe-sdk>=0.7.2        # python 3.10+
+fastapi
+uvicorn
+requests
+websocket-client           # fomo_api.py reads the Privy bearer out of Chrome over CDP
+pytest
+httpx                      # fastapi TestClient, tests only

@@ -1,11 +1,12 @@
 """FOMO has no public API. This reads your own logged-in session out of Chrome.
 
-Setup, once:
-    1. Start Chrome with remote debugging on the profile you log into FOMO with:
-         mac:     /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222
-         linux:   google-chrome --remote-debugging-port=9222
-         windows: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222
-    2. Open fomo.family in a tab, log in, leave the tab open.
+Setup, once: `python run_desk.py setup` opens Chrome for you. By hand:
+    1. Start Chrome with remote debugging AND its own profile. Chrome 136+ ignores the
+       debugging port on your normal profile, so --user-data-dir is required:
+         mac:     /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222 --user-data-dir=$HOME/.desk-chrome
+         linux:   google-chrome --remote-debugging-port=9222 --user-data-dir=$HOME/.desk-chrome
+         windows: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --user-data-dir=%USERPROFILE%\\.desk-chrome
+    2. Open fomo.family in that window, log in once, leave the tab open.
     3. python fomo_api.py <addr>:<netId>      prints the raw response for one token.
        Check it against _row() below before the first real run.
 
@@ -91,7 +92,9 @@ class Fomo:
                     and "fomo.family" in t.get("url", "")), None)
         if tab is None:
             raise RuntimeError("no fomo.family tab open in Chrome. Open it and log in.")
-        ws = websocket.create_connection(tab["webSocketDebuggerUrl"], timeout=10)
+        # no Origin header: Chrome 111+ refuses debugger connections that send one
+        ws = websocket.create_connection(tab["webSocketDebuggerUrl"], timeout=10,
+                                         suppress_origin=True)
         try:
             ws.send(json.dumps({"id": 1, "method": "Runtime.evaluate",
                                 "params": {"expression": "localStorage.getItem('privy:token')",

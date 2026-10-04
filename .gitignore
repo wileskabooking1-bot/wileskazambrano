@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+desk.db
+shadow.jsonl
+.pytest_cache/

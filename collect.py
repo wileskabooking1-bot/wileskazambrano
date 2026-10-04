@@ -219,7 +219,7 @@ def sol_top_wallet(mint: str):
 # --- states. One named object per question set, only the fields its questions read.
 
 def market_state(d: dict) -> dict:
-    keys = ("ticker", "age_minutes", "holder_count", "change", "price_usd",
+    keys = ("ticker", "age_minutes", "holder_count", "growth", "change", "price_usd",
             "buys_h1", "sells_h1", "buys_h6", "sells_h6", "trades_h24",
             "liquidity_usd", "mcap_usd", "volume_h24", "intended_ticket_usd")
     return {k: d.get(k) for k in keys}

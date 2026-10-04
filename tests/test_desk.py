@@ -11,7 +11,8 @@ from questions import SETS, PICK
 
 @pytest.fixture(autouse=True)
 def clean_book():
-    book.DB.execute("DELETE FROM position"); book.DB.execute("DELETE FROM bench")
+    for table in ("position", "bench", "watch", "seen"):
+        book.DB.execute(f"DELETE FROM {table}")
     book.DB.commit()
 
 
@@ -153,6 +154,7 @@ def test_run_once_shadow_single_survivor(monkeypatch):
     assert desk.shadow[0]["size_factor"] == 0.6
     assert [c[0] for c in calls] == ["market", "solana"]
     assert "description" not in calls[0][1]                # trimmed state
+    assert "growth" in calls[0][1]                         # shape sees holder growth
     assert book.held() is None                             # shadow never takes the book
 
 
@@ -227,3 +229,58 @@ def test_sol_top_wallet_skips_pool(monkeypatch):
 
     owners["acct_a1"] = owners["acct_a2"] = owners["acct_b"] = PUMP_CURVE
     assert collect.sol_top_wallet("Mint") is None                     # no wallet visible: missing
+
+
+# --- holder growth: two snapshots, matched windows, computed in code
+def snap(tid, minutes_ago, holders, price):
+    book.DB.execute("INSERT INTO seen VALUES (?,?,?,?)",
+                    (tid, time.time() - minutes_ago * 60, holders, price))
+
+
+def test_history_windows():
+    t = tok(holder_count=300, price_usd=0.0012)
+    assert book.history(t) == {"15m": None, "1h": None}       # first sight: not observed
+    snap(t["tid"], 3, 290, 0.0011)                            # too recent for any window
+    snap(t["tid"], 15, 200, 0.0010)
+    snap(t["tid"], 61, 100, 0.0010)
+    h = book.history(t)
+    assert h["15m"]["holders_pct"] == 0.5 and h["15m"]["price_pct"] == 0.2
+    assert h["15m"]["minutes"] == pytest.approx(15, abs=0.2)
+    assert h["1h"]["holders_pct"] == 2.0 and h["1h"]["holders_then"] == 100
+
+
+def test_history_null_holders_stay_null():
+    t = tok(holder_count=None, price_usd=0.001)
+    snap(t["tid"], 15, None, 0.0005)
+    assert book.history(t)["15m"]["holders_pct"] is None
+    assert book.history(t)["15m"]["price_pct"] == 1.0
+
+
+def test_watchlist_keeps_young_tokens_and_drops_facts():
+    book.record([tok(tid="a:1"), tok(tid="b:1"), tok(tid="c:1")])
+    book.sit("b:1", "honeypot")                               # a fact, never re-listed
+    book.sit("c:1", "age")                                    # 20 minutes, keep watching
+    assert set(book.watchlist()) == {"a:1", "c:1"}
+    book.DB.execute("UPDATE watch SET first_seen = ? WHERE tid = 'a:1'",
+                    (time.time() - 7 * 3600,))
+    assert set(book.watchlist()) == {"c:1"}                   # first seen too long ago
+
+
+def test_run_once_relists_watchlist_and_records(monkeypatch):
+    wire(monkeypatch, [tok()])
+    asked = {}
+    def shortlist(f, ids):
+        asked["ids"] = list(ids)
+        return [dict(tok())]
+    monkeypatch.setattr(main, "shortlist", shortlist)
+    monkeypatch.setattr(main, "universe", lambda: [])         # fell off new_pools
+    book.record([tok()])
+    book.DB.execute("UPDATE seen SET at = ?", (time.time() - 15 * 60,))
+    seen = {}
+    def judge(qs, state):
+        seen.setdefault(qs, state)
+        return {"model": "m", "answers": GOOD_MARKET if qs == "market" else GOOD_SOL}
+    main.run_once(None, judge, FakeDesk(), 1000)
+    assert asked["ids"] == ["Mint111:1399811149"]
+    assert seen["market"]["growth"]["15m"]["holders_pct"] == 0.0
+    assert book.DB.execute("SELECT COUNT(*) FROM seen").fetchone()[0] == 2

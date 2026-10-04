@@ -40,7 +40,14 @@ def run_once(fomo, judge, desk, bank, shadow=True):
     gt_slots, dex_slots = GT_DOSSIER, DEX_BUDGET
 
     ids = universe()                             # fresh pools, 3 chains, GT_UNIVERSE slots
-    for t in shortlist(fomo, ids):               # pass one: free, no per-token requests
+    fresh = set(ids)
+    ids += [i for i in book.watchlist() if i not in fresh]      # seen earlier, still young
+    listed = shortlist(fomo, ids)
+    for t in listed:                             # growth from earlier cycles, then record
+        t["growth"] = book.history(t)            # this one. FOMO holders on both ends.
+    book.record(listed)
+
+    for t in listed:                             # pass one: free, no per-token requests
         stats["seen"] += 1
         if book.benched(t["tid"]):               # already judged, still serving its time
             stats["benched"] += 1

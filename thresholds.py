@@ -7,7 +7,7 @@ HARD = {                        # stage 2, arithmetic, runs before anything cost
     "min_mcap_usd":      60_000,
     "max_mcap_usd":      8_000_000,
     "min_trades_h24":    150,
-    "max_top_wallet":    0.05,  # solana only, exact, from RPC
+    "max_top_wallet":    0.05,  # solana only, from RPC. Largest wallet; pools and curves excluded
     "max_top_10":        0.60,  # where distribution exists
     "min_holders":       80,
 }

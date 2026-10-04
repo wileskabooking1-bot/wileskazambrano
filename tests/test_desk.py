@@ -190,3 +190,40 @@ def test_judge_endpoint(monkeypatch):
     book.take({"token": {"ticker": "A", "address": "a", "network_id": 1}})
     assert c.post("/book/release", headers=h).json()["released"]["ticker"] == "A"
     assert book.held() is None
+
+
+# --- solana top wallet: pool and bonding-curve accounts are not wallets
+WALLET_A = "F9BK8YUxgtxR6q2XDzfmT9F8z6NEKUxpDyWgPrnJqABJ"
+WALLET_B = "9717mc1oookdyGSfSKiPD5URfjUEE1ADYXzuVu96W1tB"
+RAYDIUM_AUTHORITY = "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"   # real AMM v4 PDA
+PUMP_CURVE = "D7ztWciaUVi24op4yYt65TrjqvV6yLxYmcY5A4i6saFh"          # a bonding-curve PDA
+
+
+def test_on_curve():
+    assert collect.on_curve(WALLET_A) and collect.on_curve(WALLET_B)
+    assert collect.on_curve("11111111111111111111111111111111")
+    assert not collect.on_curve(RAYDIUM_AUTHORITY)
+    assert not collect.on_curve(PUMP_CURVE)
+
+
+def test_sol_top_wallet_skips_pool(monkeypatch):
+    top = [{"address": "acct_pool", "amount": "600"},       # the pool: 60% of supply
+           {"address": "acct_a1", "amount": "30"},
+           {"address": "acct_b", "amount": "35"},
+           {"address": "acct_a2", "amount": "10"},           # wallet A's second account
+           {"address": "acct_closed", "amount": "5"}]
+    owners = {"acct_pool": RAYDIUM_AUTHORITY, "acct_a1": WALLET_A,
+              "acct_b": WALLET_B, "acct_a2": WALLET_A}
+    def rpc(url, json, timeout):
+        m, p = json["method"], json["params"]
+        res = {"getTokenSupply": {"value": {"amount": "1000"}},
+               "getTokenLargestAccounts": {"value": top},
+               "getMultipleAccounts": {"value": [
+                   {"data": {"parsed": {"info": {"owner": owners[a]}}}} if a in owners else None
+                   for a in p[0]]}}[m]
+        return type("R", (), {"json": lambda self: {"result": res}})()
+    monkeypatch.setattr(collect.requests, "post", rpc)
+    assert collect.sol_top_wallet("Mint") == pytest.approx(0.040)   # A: 30 + 10, not the pool's 600
+
+    owners["acct_a1"] = owners["acct_a2"] = owners["acct_b"] = PUMP_CURVE
+    assert collect.sol_top_wallet("Mint") is None                     # no wallet visible: missing

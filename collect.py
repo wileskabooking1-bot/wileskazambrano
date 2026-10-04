@@ -160,13 +160,60 @@ def clean_handle(h):
     return h if h and h.replace("_", "").isalnum() and len(h) <= 15 else None
 
 
+# --- Solana: who actually owns the biggest balances
+
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_P = 2**255 - 19
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+
+
+def b58decode(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + _B58.index(c)
+    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    return b"\0" * (len(s) - len(s.lstrip("1"))) + raw
+
+
+def on_curve(address: str) -> bool:
+    """True for a key someone holds (a wallet), False for a program-derived address.
+       Pool vaults, bonding curves and lockers are owned by PDAs, which are off the
+       ed25519 curve by construction. Same test as Solana's Pubkey::is_on_curve."""
+    b = b58decode(address)
+    if len(b) != 32:
+        return False
+    y = int.from_bytes(b, "little") & ((1 << 255) - 1)
+    if y >= _P:
+        return False
+    u, v = (y * y - 1) % _P, (_D * y * y + 1) % _P
+    x2 = u * pow(v, _P - 2, _P) % _P                  # x^2 = (y^2 - 1) / (d y^2 + 1)
+    if x2 == 0:
+        return not b[31] >> 7                         # x = 0 cannot carry a sign bit
+    return pow(x2, (_P - 1) // 2, _P) == 1            # a square mod p means a point
+
+
 def sol_top_wallet(mint: str):
+    """Largest share of supply held by one wallet, leaving out accounts a program
+       controls. The biggest token account on a fresh launch is almost always the
+       pool or the bonding curve, and counting it would kill every token."""
     q = lambda m, p: requests.post(SOL_RPC, json={"jsonrpc": "2.0", "id": 1,
                                                   "method": m, "params": p},
                                    timeout=20).json()["result"]
     supply = float(q("getTokenSupply", [mint])["value"]["amount"])
     top = q("getTokenLargestAccounts", [mint])["value"]
-    return float(top[0]["amount"]) / supply if supply and top else None
+    if not supply or not top:
+        return None
+    infos = q("getMultipleAccounts", [[a["address"] for a in top],
+                                      {"encoding": "jsonParsed"}])["value"]
+    held = {}
+    for acct, info in zip(top, infos):
+        try:
+            owner = info["data"]["parsed"]["info"]["owner"]
+        except (TypeError, KeyError):
+            continue                                  # closed or unparsable, skip it
+        if on_curve(owner):                           # wallets only, summed per owner
+            held[owner] = held.get(owner, 0.0) + float(acct["amount"])
+    return max(held.values()) / supply if held else None
 
 
 # --- states. One named object per question set, only the fields its questions read.
